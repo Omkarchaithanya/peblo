@@ -2,7 +2,7 @@
 
 A powerful AI-powered learning platform that ingests educational content from PDFs and converts it into interactive learning experiences with adaptive difficulty.
 
-## 🏆 Features
+##  Features
 
 ### Core Features
 - **PDF Content Ingestion** - Extract and structure content from educational PDFs
@@ -19,7 +19,7 @@ A powerful AI-powered learning platform that ingests educational content from PD
 - **Question Quality Metrics** - Automated scoring (0-1 scale)
 - **Streak Bonuses** - Gamification elements for engagement
 
-## 🏗️ Architecture
+##  Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -51,7 +51,7 @@ A powerful AI-powered learning platform that ingests educational content from PD
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 📊 Database Schema
+##  Database Schema
 
 ### Core Tables
 
@@ -87,7 +87,7 @@ StudentAnswer {
 }
 ```
 
-## 🚀 Setup Instructions
+##  Setup Instructions
 
 ### Prerequisites
 - Node.js 18+ 
@@ -122,7 +122,7 @@ Create a `.env` file with:
 DATABASE_URL="file:./db/custom.db"
 ```
 
-## 📡 API Endpoints
+##  API Endpoints
 
 ### POST /api/ingest
 Upload and process a PDF file.
@@ -234,7 +234,7 @@ List all students or get specific student.
 ### GET /api/documents
 List all ingested documents.
 
-## 🧠 Adaptive Difficulty Algorithm
+##  Adaptive Difficulty Algorithm
 
 The system uses an ELO-like rating system:
 
@@ -254,7 +254,7 @@ Where:
 - **Medium**: Rating 1100 - 1400
 - **Hard**: Rating 1400+
 
-## 🎯 Sample Outputs
+##  Sample Outputs
 
 ### Extracted Content Chunk
 ```json
@@ -286,7 +286,7 @@ Where:
 }
 ```
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 src/
@@ -310,7 +310,7 @@ src/
     └── schema.prisma             # Database schema
 ```
 
-## 🧪 Testing
+##  Testing
 
 ```bash
 # Run linting
@@ -320,14 +320,14 @@ bun run lint
 # Use the UI dashboard or curl commands above
 ```
 
-## 📝 Sample PDFs
+##  Sample PDFs
 
 The following sample PDFs are provided for testing:
 1. `peblo_pdf_grade1_math_numbers.pdf` - Numbers, counting, and shapes
 2. `peblo_pdf_grade3_science_plants_animals.pdf` - Plants and animals
 3. `peblo_pdf_grade4_english_grammar.pdf` - Grammar and vocabulary
 
-## 🎨 Technology Stack
+##  Technology Stack
 
 - **Framework**: Next.js 16 with App Router
 - **Language**: TypeScript 5
@@ -336,10 +336,10 @@ The following sample PDFs are provided for testing:
 - **UI**: Tailwind CSS + shadcn/ui
 - **PDF Processing**: pdf-parse
 
-## 📄 License
+##  License
 
 MIT License
 
-## 👥 Author
+##  Author
 
 Built for the Peblo AI Backend Engineer Challenge.
