@@ -1,0 +1,287 @@
+// Peblo AI - Content Ingestion + Adaptive Quiz Engine
+// Simplified Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./db/custom.db"
+}
+
+// =============================================================================
+// SOURCE DOCUMENTS - PDF and content source management
+// =============================================================================
+model SourceDocument {
+  id          String   @id @default(cuid())
+  filename    String
+  originalName String
+  filePath    String
+  fileSize    Int
+  mimeType    String
+  
+  // Metadata extracted from filename/content
+  grade       Int      // Grade level (1-12)
+  subject     String   // Math, Science, English, etc.
+  topic       String   // Specific topic within subject
+  
+  // Processing status
+  status      ProcessingStatus @default(PENDING)
+  processedAt DateTime?
+  error       String?
+  
+  // Statistics
+  chunkCount  Int      @default(0)
+  questionCount Int    @default(0)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  chunks      ContentChunk[]
+  questions   QuizQuestion[]
+  
+  @@index([grade, subject])
+  @@index([status])
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// =============================================================================
+// CONTENT CHUNKS - Structured text segments from documents
+// =============================================================================
+model ContentChunk {
+  id            String   @id @default(cuid())
+  sourceId      String
+  chunkIndex    Int      // Order in source document
+  
+  // Content
+  text          String   // Raw text content
+  cleanedText   String   // Cleaned/processed text
+  
+  // Semantic information
+  topic         String   // Topic identified from content
+  keywords      String   // JSON array of keywords
+  
+  // Quality metrics
+  wordCount     Int
+  sentenceCount Int      @default(0)
+  qualityScore  Float    @default(0) // 0-1 score for content quality
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  source        SourceDocument @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  questions     QuizQuestion[]
+  
+  @@unique([sourceId, chunkIndex])
+  @@index([sourceId])
+  @@index([topic])
+}
+
+// =============================================================================
+// QUIZ QUESTIONS - Generated questions from content
+// =============================================================================
+model QuizQuestion {
+  id            String   @id @default(cuid())
+  sourceId      String
+  chunkId       String
+  
+  // Question content
+  question      String
+  questionType  String   // MCQ, TRUE_FALSE, FILL_BLANK
+  
+  // Answer data
+  options       String?  // JSON array for MCQ options
+  correctAnswer String
+  explanation   String?  // Why this answer is correct
+  
+  // Metadata
+  difficulty    String   @default("MEDIUM") // EASY, MEDIUM, HARD
+  topic         String
+  
+  // Quality metrics
+  qualityScore  Float    @default(0.5) // 0-1 quality score
+  isDuplicate   Boolean  @default(false)
+  
+  // Statistics
+  timesAsked    Int      @default(0)
+  timesCorrect  Int      @default(0)
+  avgResponseTime Int?   // In milliseconds
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  source        SourceDocument @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  chunk         ContentChunk   @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  answers       StudentAnswer[]
+  
+  @@index([sourceId])
+  @@index([chunkId])
+  @@index([topic])
+}
+
+// =============================================================================
+// STUDENTS - Student profiles with adaptive learning data
+// =============================================================================
+model Student {
+  id            String   @id @default(cuid())
+  name          String
+  email         String?  @unique
+  
+  // Adaptive learning metrics - ELO-like rating system
+  overallRating Float    @default(1000) // Starting ELO rating
+  
+  // Topic-specific mastery (ELO per topic)
+  topicMastery  String?  // JSON object: { "math": 1050, "science": 980 }
+  
+  // Statistics
+  totalQuizzesTaken Int  @default(0)
+  totalCorrect      Int  @default(0)
+  totalQuestions    Int  @default(0)
+  currentStreak     Int  @default(0) // Consecutive correct answers
+  bestStreak        Int  @default(0)
+  
+  // Learning preferences
+  preferredDifficulty String @default("MEDIUM") // EASY, MEDIUM, HARD
+  learningPace       String @default("NORMAL") // SLOW, NORMAL, FAST
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastActiveAt  DateTime @default(now())
+  
+  // Relations
+  answers       StudentAnswer[]
+  sessions      QuizSession[]
+  progress      TopicProgress[]
+  
+  @@index([overallRating])
+}
+
+// =============================================================================
+// TOPIC PROGRESS - Track student progress per topic
+// =============================================================================
+model TopicProgress {
+  id            String   @id @default(cuid())
+  studentId     String
+  topic         String
+  subject       String
+  grade         Int
+  
+  // ELO-based mastery
+  currentRating Float    @default(1000)
+  highestRating Float    @default(1000)
+  
+  // Statistics
+  questionsAttempted Int  @default(0)
+  questionsCorrect   Int  @default(0)
+  easyCorrect        Int  @default(0)
+  easyAttempted      Int  @default(0)
+  mediumCorrect      Int  @default(0)
+  mediumAttempted    Int  @default(0)
+  hardCorrect        Int  @default(0)
+  hardAttempted      Int  @default(0)
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastPracticed DateTime @default(now())
+  
+  // Relations
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  @@unique([studentId, topic])
+  @@index([studentId])
+  @@index([topic])
+}
+
+// =============================================================================
+// QUIZ SESSIONS - Track individual quiz sessions
+// =============================================================================
+model QuizSession {
+  id            String   @id @default(cuid())
+  studentId     String
+  
+  // Session configuration
+  topic         String?
+  difficulty    String?  // EASY, MEDIUM, HARD
+  questionCount Int      @default(10)
+  
+  // Session state
+  status        String   @default("ACTIVE") // ACTIVE, COMPLETED, ABANDONED
+  currentQuestion Int    @default(0)
+  
+  // Results
+  score         Float?   // Percentage score
+  correctCount  Int      @default(0)
+  totalAnswered Int      @default(0)
+  avgResponseTime Int?   // Average response time in ms
+  
+  // Adaptive algorithm data
+  startRating   Float    // Student's rating at session start
+  endRating     Float?   // Student's rating at session end
+  ratingChange  Float?   // Total rating change
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  completedAt   DateTime?
+  
+  // Relations
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  answers       StudentAnswer[]
+  
+  @@index([studentId])
+  @@index([status])
+}
+
+// =============================================================================
+// STUDENT ANSWERS - Individual answer records
+// =============================================================================
+model StudentAnswer {
+  id            String   @id @default(cuid())
+  studentId     String
+  questionId    String
+  sessionId     String?
+  
+  // Answer data
+  selectedAnswer String
+  isCorrect     Boolean
+  responseTime  Int?     // Response time in milliseconds
+  
+  // Difficulty at time of answer
+  questionDifficulty String
+  
+  // Adaptive algorithm feedback
+  ratingBefore  Float    // Student's rating before this answer
+  ratingAfter   Float    // Student's rating after this answer
+  ratingChange  Float    // Rating delta
+  
+  // Confidence and hints
+  confidence    Float?   // 0-1 if student provides confidence
+  usedHint      Boolean  @default(false)
+  
+  // Timestamp
+  answeredAt    DateTime @default(now())
+  
+  // Relations
+  student       Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  question      QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  session       QuizSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  
+  @@index([studentId])
+  @@index([questionId])
+  @@index([sessionId])
+}
