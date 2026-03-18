@@ -70,13 +70,14 @@ export async function generateQuestionsFromChunk(
     throw new Error(`Chunk not found: ${chunkId}`);
   }
   
+  const preparedContent = prepareContentForQuestionGeneration(chunk.cleanedText);
   const zai = await getZAI();
   const questions: GeneratedQuestion[] = [];
 
   if (!zai) {
     for (const type of types) {
       if (questions.length >= count) break;
-      const generated = generateFallbackQuestions(chunk.cleanedText, type, chunk.source.grade, chunk.topic, count - questions.length);
+      const generated = generateFallbackQuestions(preparedContent, type, chunk.source.grade, chunk.topic, count - questions.length);
       for (const q of generated) {
         const validation = validateQuestion(q);
         questions.push({
@@ -97,7 +98,7 @@ export async function generateQuestionsFromChunk(
     try {
       const generatedQuestions = await generateQuestionByType(
         zai,
-        chunk.cleanedText,
+        preparedContent,
         type,
         chunk.source.grade,
         chunk.topic
@@ -129,6 +130,27 @@ export async function generateQuestionsFromChunk(
   }
   
   return questions;
+}
+
+function prepareContentForQuestionGeneration(content: string): string {
+  const normalized = content
+    .replace(/\r/g, '\n')
+    .replace(/\t/g, ' ')
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const sentences = normalized
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 20)
+    .filter((s) => /[a-zA-Z]/.test(s))
+    .filter((s) => {
+      const symbolCount = (s.match(/[^a-zA-Z0-9\s.,!?-]/g) || []).length;
+      return symbolCount / Math.max(s.length, 1) < 0.12;
+    });
+
+  return sentences.slice(0, 20).join(' ');
 }
 
 function generateFallbackQuestions(

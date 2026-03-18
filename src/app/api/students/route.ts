@@ -8,6 +8,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getStudentPerformanceStats } from '@/lib/services/adaptive-difficulty';
+import { z } from 'zod';
+
+const createStudentSchema = z.object({
+  name: z.string().trim().min(1, 'Student name is required').max(80),
+  email: z.string().trim().email().optional(),
+  preferredDifficulty: z.enum(['EASY', 'MEDIUM', 'HARD']).optional(),
+  learningPace: z.enum(['SLOW', 'NORMAL', 'FAST']).optional(),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -78,20 +86,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
-    const {
-      name,
-      email,
-      preferredDifficulty,
-      learningPace,
-    } = body;
-    
-    if (!name) {
+    const parsed = createStudentSchema.safeParse(body);
+
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Student name is required' },
+        { error: 'Invalid request body', details: parsed.error.flatten() },
         { status: 400 }
       );
     }
+
+    const { name, email, preferredDifficulty, learningPace } = parsed.data;
     
     // Check if email already exists
     if (email) {

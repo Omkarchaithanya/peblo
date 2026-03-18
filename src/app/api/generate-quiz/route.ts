@@ -13,28 +13,36 @@ import {
   getQuizQuestions 
 } from '@/lib/services/quiz-generation';
 import { db } from '@/lib/db';
-import { QuestionType, Difficulty } from '@prisma/client';
+import { z } from 'zod';
+
+const QUESTION_TYPES = ['MCQ', 'TRUE_FALSE', 'FILL_BLANK'] as const;
+const DIFFICULTIES = ['EASY', 'MEDIUM', 'HARD'] as const;
+
+const generateQuizSchema = z.object({
+  sourceId: z.string().trim().min(1).optional(),
+  chunkId: z.string().trim().min(1).optional(),
+  topic: z.string().trim().min(1).optional(),
+  count: z.coerce.number().int().min(1).max(20).default(3),
+  types: z.array(z.enum(QUESTION_TYPES)).optional(),
+  difficulty: z.enum(DIFFICULTIES).optional(),
+}).refine((v) => Boolean(v.sourceId || v.chunkId || v.topic), {
+  message: 'Please provide sourceId, chunkId, or topic',
+  path: ['sourceId'],
+});
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
-    const {
-      sourceId,
-      chunkId,
-      topic,
-      count = 3,
-      types,
-      difficulty,
-    } = body;
-    
-    // Validate that at least one filter is provided
-    if (!sourceId && !chunkId && !topic) {
+    const parsed = generateQuizSchema.safeParse(body);
+
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Please provide sourceId, chunkId, or topic' },
+        { error: 'Invalid request body', details: parsed.error.flatten() },
         { status: 400 }
       );
     }
+
+    const { sourceId, chunkId, topic, count, types } = parsed.data;
     
     let questionsCreated = 0;
     let questionIds: string[] = [];
@@ -47,7 +55,7 @@ export async function POST(request: NextRequest) {
       questionIds = result.questionIds;
     } else if (chunkId) {
       // Generate for specific chunk
-      const questionTypes = (types as QuestionType[]) || [QuestionType.MCQ, QuestionType.TRUE_FALSE, QuestionType.FILL_BLANK];
+      const questionTypes = types || [...QUESTION_TYPES];
       const questions = await generateQuestionsFromChunk(chunkId, count, questionTypes);
       questionIds = await storeQuestions(questions);
       questionsCreated = questions.length;
@@ -93,8 +101,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     
     const topic = searchParams.get('topic') || undefined;
-    const difficulty = searchParams.get('difficulty') as Difficulty | null;
-    const type = searchParams.get('type') as QuestionType | null;
+    const difficulty = searchParams.get('difficulty') || undefined;
+    const type = searchParams.get('type') || undefined;
     const limit = parseInt(searchParams.get('limit') || '10');
     
     const questions = await getQuizQuestions({

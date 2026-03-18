@@ -68,6 +68,7 @@ export default function PebloDashboard() {
   // State
   const [documents, setDocuments] = useState<Document[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [reviewQuestions, setReviewQuestions] = useState<Question[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -100,6 +101,12 @@ export default function PebloDashboard() {
           if (studentsData.data.length > 0) {
             setSelectedStudent(studentsData.data[0]);
           }
+        }
+
+        const reviewRes = await fetch('/api/quiz?limit=20');
+        const reviewData = await reviewRes.json();
+        if (reviewData.success) {
+          setReviewQuestions(reviewData.data.questions || []);
         }
       } catch (error) {
         console.error('Error loading data:', error);
@@ -155,6 +162,18 @@ export default function PebloDashboard() {
     }
   };
 
+  const fetchReviewQuestions = async () => {
+    try {
+      const res = await fetch('/api/quiz?limit=20');
+      const data = await res.json();
+      if (data.success) {
+        setReviewQuestions(data.data.questions || []);
+      }
+    } catch (error) {
+      console.error('Error fetching review questions:', error);
+    }
+  };
+
   // File upload handler
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -197,7 +216,8 @@ export default function PebloDashboard() {
       
       if (data.success) {
         alert(`Generated ${data.data.questionsCreated} quiz questions!`);
-        fetchDocuments();
+        await fetchDocuments();
+        await fetchReviewQuestions();
       } else {
         alert(`Error: ${data.error}`);
       }
@@ -225,6 +245,7 @@ export default function PebloDashboard() {
         setQuizResult(null);
         setSelectedAnswer('');
         await fetchDocuments();
+        await fetchReviewQuestions();
         alert('Document deleted. You can now upload a fresh PDF.');
       } else {
         alert(`Error: ${data.error}`);
@@ -232,6 +253,30 @@ export default function PebloDashboard() {
     } catch (error) {
       console.error('Delete error:', error);
       alert('Failed to delete document');
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteQuestion = async (questionId: string) => {
+    const confirmed = window.confirm('Delete this generated question?');
+    if (!confirmed) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/quiz?id=${questionId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        await fetchDocuments();
+        await fetchReviewQuestions();
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Delete question error:', error);
+      alert('Failed to delete question');
     }
     setLoading(false);
   };
@@ -620,6 +665,57 @@ export default function PebloDashboard() {
                       <li>• Content traceability</li>
                       <li>• Difficulty classification</li>
                     </ul>
+                  </div>
+
+                  <Separator className="bg-slate-300" />
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-sm">Generated Questions Review</h4>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-slate-300"
+                        onClick={fetchReviewQuestions}
+                        disabled={loading}
+                      >
+                        Refresh
+                      </Button>
+                    </div>
+
+                    <ScrollArea className="h-44">
+                      <div className="space-y-2">
+                        {reviewQuestions.length === 0 ? (
+                          <p className="text-xs text-slate-600">No generated questions yet. Click Generate on a document.</p>
+                        ) : (
+                          reviewQuestions.map((q) => (
+                            <div key={q.id} className="rounded-lg border border-slate-200 bg-white p-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-xs font-medium text-slate-800 line-clamp-2">{q.question}</p>
+                                  <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-600">
+                                    <span>{q.type}</span>
+                                    <span>•</span>
+                                    <span>{q.difficulty}</span>
+                                    <span>•</span>
+                                    <span>{q.topic}</span>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7 border-red-200 text-red-700 hover:bg-red-50"
+                                  onClick={() => handleDeleteQuestion(q.id)}
+                                  disabled={loading}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </ScrollArea>
                   </div>
                 </CardContent>
               </Card>

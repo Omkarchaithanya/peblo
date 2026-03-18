@@ -8,11 +8,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processStudentAnswer, getAdaptiveQuestion } from '@/lib/services/adaptive-difficulty';
 import { db } from '@/lib/db';
+import { z } from 'zod';
+
+const submitAnswerSchema = z.object({
+  studentId: z.string().trim().min(1),
+  questionId: z.string().trim().min(1),
+  selectedAnswer: z.string().trim().min(1),
+  responseTime: z.coerce.number().int().min(0).max(600000).optional(),
+  confidence: z.coerce.number().min(0).max(1).optional(),
+  sessionId: z.string().trim().min(1).optional(),
+});
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
+    const parsed = submitAnswerSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
     const {
       studentId,
       questionId,
@@ -20,15 +38,7 @@ export async function POST(request: NextRequest) {
       responseTime,
       confidence,
       sessionId,
-    } = body;
-    
-    // Validate required fields
-    if (!studentId || !questionId || selectedAnswer === undefined) {
-      return NextResponse.json(
-        { error: 'Missing required fields: studentId, questionId, selectedAnswer' },
-        { status: 400 }
-      );
-    }
+    } = parsed.data;
     
     // Process the answer and get adaptive feedback
     const result = await processStudentAnswer(
